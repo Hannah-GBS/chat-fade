@@ -141,6 +141,18 @@ public interface ChatFadeConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "showTypingInput",
+		name = "Show Typing Input",
+		description = "Show your typed text as an overlay when the chatbox is collapsed",
+		position = 22,
+		section = behaviorSection
+	)
+	default boolean showTypingInput()
+	{
+		return true;
+	}
+
 	// ── Message Types ───────────────────────────────────────
 
 	@ConfigSection(

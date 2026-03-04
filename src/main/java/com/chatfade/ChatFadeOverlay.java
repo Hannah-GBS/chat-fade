@@ -12,6 +12,7 @@ import java.awt.RenderingHints;
 import java.util.List;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.ui.overlay.Overlay;
@@ -45,15 +46,19 @@ public class ChatFadeOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (config.onlyWhenCollapsed() && !isChatboxCollapsed())
+		boolean collapsed = isChatboxCollapsed();
+
+		if (config.onlyWhenCollapsed() && !collapsed)
 		{
 			return null;
 		}
 
 		plugin.pruneExpiredMessages();
 
+		String typedText = getTypedText(collapsed);
 		List<FadingMessage> messages = plugin.getMessages();
-		if (messages.isEmpty())
+
+		if (messages.isEmpty() && typedText == null)
 		{
 			return null;
 		}
@@ -67,8 +72,9 @@ public class ChatFadeOverlay extends Overlay
 
 		FontMetrics fm = graphics.getFontMetrics();
 		int lineHeight = fm.getHeight();
+		boolean hasTypingLine = typedText != null;
 
-		int baseY = calculateBaseY(lineHeight, messages.size());
+		int baseY = calculateBaseY(lineHeight, messages.size(), hasTypingLine);
 		int baseX = PADDING_LEFT;
 
 		long now = System.currentTimeMillis();
@@ -114,6 +120,53 @@ public class ChatFadeOverlay extends Overlay
 			y += lineHeight + LINE_SPACING;
 		}
 
+		// Render typing input line
+		if (hasTypingLine)
+		{
+			graphics.setComposite(originalComposite);
+
+			int caretWidth = fm.stringWidth("> ");
+			int textX = baseX + caretWidth;
+			int inputY = calculateTypingInputY(lineHeight);
+
+			// Blinking caret
+			boolean showCaret = System.currentTimeMillis() % 1000 < 500;
+			if (showCaret)
+			{
+				graphics.setColor(Color.BLACK);
+				graphics.drawString(">", baseX + SHADOW_OFFSET, inputY + SHADOW_OFFSET);
+				graphics.setColor(Color.WHITE);
+				graphics.drawString(">", baseX, inputY);
+			}
+
+			// Truncate message text if needed
+			String inputDisplay = typedText;
+			int maxWidth = config.maxMessageWidth() - caretWidth;
+			if (fm.stringWidth(inputDisplay) > maxWidth)
+			{
+				String ellipsis = "...";
+				int availableWidth = maxWidth - fm.stringWidth(ellipsis);
+				StringBuilder sb = new StringBuilder();
+				for (int i = 0; i < inputDisplay.length(); i++)
+				{
+					if (fm.stringWidth(sb.toString() + inputDisplay.charAt(i)) > availableWidth)
+					{
+						break;
+					}
+					sb.append(inputDisplay.charAt(i));
+				}
+				inputDisplay = sb + ellipsis;
+			}
+
+			// Shadow
+			graphics.setColor(Color.BLACK);
+			graphics.drawString(inputDisplay, textX + SHADOW_OFFSET, inputY + SHADOW_OFFSET);
+
+			// Main text
+			graphics.setColor(Color.WHITE);
+			graphics.drawString(inputDisplay, textX, inputY);
+		}
+
 		graphics.setComposite(originalComposite);
 
 		return null;
@@ -153,7 +206,29 @@ public class ChatFadeOverlay extends Overlay
 		return text;
 	}
 
-	private int calculateBaseY(int lineHeight, int messageCount)
+	private String getTypedText(boolean collapsed)
+	{
+		if (!collapsed || !config.showTypingInput())
+		{
+			return null;
+		}
+
+		String typed = client.getVarcStrValue(VarClientID.CHATINPUT);
+		if (typed == null || typed.isEmpty())
+		{
+			return null;
+		}
+
+		return typed;
+	}
+
+	private int calculateTypingInputY(int lineHeight)
+	{
+		int canvasHeight = client.getCanvasHeight();
+		return canvasHeight - 22 - PADDING_BOTTOM;
+	}
+
+	private int calculateBaseY(int lineHeight, int messageCount, boolean hasTypingLine)
 	{
 		int canvasHeight = client.getCanvasHeight();
 		int chatboxTop;
@@ -183,9 +258,10 @@ public class ChatFadeOverlay extends Overlay
 			chatboxTop = canvasHeight - 22;
 		}
 
+		int typingOffset = hasTypingLine ? lineHeight + LINE_SPACING : 0;
 		int totalHeight = messageCount * (lineHeight + LINE_SPACING) - LINE_SPACING;
 
-		return chatboxTop - totalHeight - PADDING_BOTTOM;
+		return chatboxTop - totalHeight - PADDING_BOTTOM - typingOffset;
 	}
 
 	private boolean isChatboxCollapsed()
