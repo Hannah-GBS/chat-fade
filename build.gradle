@@ -28,7 +28,13 @@ dependencies {
 }
 
 group = 'com.chatfade'
-version = '1.4.1'
+
+// The Plugin Hub reads the version from runelite-plugin.properties — and with
+// build=standard it replaces this file entirely — so that is the single source of truth.
+// Reading it here keeps the local jar name in step instead of letting the two drift.
+def pluginManifest = new Properties()
+file('runelite-plugin.properties').withInputStream { pluginManifest.load(it) }
+version = pluginManifest.getProperty('version')
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
