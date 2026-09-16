@@ -113,6 +113,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	private boolean chatHiddenPrevious = true;
 	private int lastClickedTab = 0;
 	private final IgnoreList ignoreList = new IgnoreList();
+	private final ChatIcons chatIcons = new ChatIcons();
 
 	// ── Lifecycle ───────────────────────────────────────────
 
@@ -130,6 +131,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	{
 		overlayManager.remove(overlay);
 		messages.clear();
+		chatIcons.clear();
 		spriteManager.removeSpriteOverrides(FixedHideChatSprites.values());
 		keyManager.unregisterKeyListener(this);
 		chatHidden = true;
@@ -301,6 +303,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 		String cleanedText = toDisplayText(rawMessage);
 
 		String sender = chatMessage.getName();
+		List<java.awt.image.BufferedImage> senderIcons = extractSenderIcons(sender);
 		if (sender != null && !sender.isEmpty())
 		{
 			sender = toDisplayText(sender);
@@ -334,9 +337,13 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			: getCustomColorForType(type);
 
 		// Parse in-game color tags — if present, these take priority over per-type colors
-		List<ColorSpan> colorSpans = config.preserveInlineColors()
-			? parseColorSpans(rawForSpans, color)
-			: null;
+		// Icons and colours are independent options: with "Preserve In-Game Colors" off we
+		// still want icons drawn, just with every run of text at the per-type colour.
+		List<ColorSpan> colorSpans = parseColorSpans(rawForSpans, color, iconResolver());
+		if (!config.preserveInlineColors())
+		{
+			colorSpans = dropSpanColours(colorSpans, color);
+		}
 
 		colorSpans = applyLootHighlight(colorSpans, cleanedText, color);
 
@@ -353,6 +360,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			.messageNode(messageNode)
 			.messageId(messageNode != null ? messageNode.getId() : -1)
 			.rawText(chatMessage.getMessage())
+			.senderIcons(senderIcons)
 			.build();
 
 		messages.add(fadingMessage);
@@ -455,6 +463,31 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 		return Text.unescapeJagex(rawMessage).replace('\n', ' ');
 	}
 
+	/** @return the icon for an {@code <img=N>} tag, or null if it is not one or cannot resolve */
+	private static java.awt.image.BufferedImage resolveIconTag(String tag,
+		java.util.function.IntFunction<java.awt.image.BufferedImage> iconResolver)
+	{
+		if (iconResolver == null)
+		{
+			return null;
+		}
+
+		Matcher m = ChatIcons.IMG_TAG.matcher(tag);
+		if (!m.matches())
+		{
+			return null;
+		}
+
+		try
+		{
+			return iconResolver.apply(Integer.parseInt(m.group(1)));
+		}
+		catch (NumberFormatException ex)
+		{
+			return null;
+		}
+	}
+
 	/**
 	 * @return the character an escaped printable pseudo-tag stands for, or null if the tag is
 	 * ordinary markup that should simply be dropped
@@ -536,6 +569,71 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			return config.lowValueColor();
 		}
 		return null;
+	}
+
+	/**
+	 * Resets every text run to the per-type colour, keeping icons. Returns null when nothing
+	 * but fallback-coloured text is left, so the caller falls back to plain rendering.
+	 */
+	static List<ColorSpan> dropSpanColours(List<ColorSpan> spans, Color fallback)
+	{
+		if (spans == null || spans.isEmpty())
+		{
+			return null;
+		}
+
+		if (spans.stream().noneMatch(ColorSpan::isIcon))
+		{
+			return null;
+		}
+
+		List<ColorSpan> out = new ArrayList<>(spans.size());
+		for (ColorSpan span : spans)
+		{
+			out.add(span.isIcon() ? span : new ColorSpan(span.getText(), fallback));
+		}
+		return out;
+	}
+
+	/**
+	 * @return a resolver for inline chat icons, or null when the option is off so that the
+	 * parser drops icon tags exactly as it did before
+	 */
+	private java.util.function.IntFunction<java.awt.image.BufferedImage> iconResolver()
+	{
+		return config.showChatIcons() ? index -> chatIcons.resolve(client, index) : null;
+	}
+
+	/**
+	 * Pulls the badges that precede a sender's name out of the raw name string.
+	 *
+	 * <p>Rank, title and account-type icons are always a prefix in chat, so they are kept as
+	 * an ordered list rather than positioned spans.
+	 */
+	private List<java.awt.image.BufferedImage> extractSenderIcons(String rawName)
+	{
+		if (!config.showChatIcons() || rawName == null || rawName.indexOf('<') < 0)
+		{
+			return null;
+		}
+
+		List<java.awt.image.BufferedImage> icons = null;
+		Matcher matcher = ChatIcons.IMG_TAG.matcher(rawName);
+		while (matcher.find())
+		{
+			java.awt.image.BufferedImage icon =
+				chatIcons.resolve(client, Integer.parseInt(matcher.group(1)));
+			if (icon == null)
+			{
+				continue;
+			}
+			if (icons == null)
+			{
+				icons = new ArrayList<>(2);
+			}
+			icons.add(icon);
+		}
+		return icons;
 	}
 
 	/**
@@ -1275,8 +1373,21 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 
 	static List<ColorSpan> parseColorSpans(String raw, Color fallback)
 	{
+		return parseColorSpans(raw, fallback, null);
+	}
+
+	/**
+	 * @param iconResolver turns an {@code <img=N>} index into a drawable icon, or null to
+	 * drop icons as before
+	 */
+	static List<ColorSpan> parseColorSpans(String raw, Color fallback,
+		java.util.function.IntFunction<java.awt.image.BufferedImage> iconResolver)
+	{
 		// Input is macro-expanded, so <col=...> is the only colour syntax that can appear.
-		if (!raw.contains("<col="))
+		// Icons matter too: a message can be worth rendering as spans purely because it
+		// contains one, even with no colour markup at all.
+		boolean wantsIcons = iconResolver != null && raw.contains("<img=");
+		if (!raw.contains("<col=") && !wantsIcons)
 		{
 			return null;
 		}
@@ -1321,13 +1432,29 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 				}
 				else
 				{
-					// Other tag. Escaped printables (<at>, <lt>, ...) stand for a real
-					// character and must survive; anything else (img, ...) is dropped.
-					String entity = unescapeEntity(raw.substring(pos, anyMatcher.end()));
+					String tag = raw.substring(pos, anyMatcher.end());
+
+					// Escaped printables (<at>, <lt>, ...) stand for a real character.
+					String entity = unescapeEntity(tag);
 					if (entity != null)
 					{
 						currentText.append(entity);
+						pos = anyMatcher.end();
+						continue;
 					}
+
+					// Inline chat icons become their own span so the renderer can draw them.
+					java.awt.image.BufferedImage icon = resolveIconTag(tag, iconResolver);
+					if (icon != null)
+					{
+						if (currentText.length() > 0)
+						{
+							spans.add(new ColorSpan(currentText.toString(), currentColor));
+							currentText.setLength(0);
+						}
+						spans.add(ColorSpan.icon(icon));
+					}
+
 					pos = anyMatcher.end();
 				}
 			}
@@ -1343,11 +1470,13 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			spans.add(new ColorSpan(currentText.toString(), currentColor));
 		}
 
-		// Filter out empty spans
-		spans.removeIf(s -> s.getText().isEmpty());
+		// Filter out empty spans, but never the icon ones — they carry no text by design.
+		spans.removeIf(s -> !s.isIcon() && s.getText().isEmpty());
 
-		// If all spans use the fallback color, no multi-color — return null
-		if (spans.stream().allMatch(s -> s.getColor().equals(fallback)))
+		// Spans are only worth keeping if they say something a single colour could not:
+		// either more than one colour, or at least one icon to draw.
+		boolean hasIcon = spans.stream().anyMatch(ColorSpan::isIcon);
+		if (!hasIcon && spans.stream().allMatch(s -> fallback.equals(s.getColor())))
 		{
 			return null;
 		}

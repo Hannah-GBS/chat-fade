@@ -8,6 +8,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.awt.RenderingHints;
 import java.util.List;
 import javax.inject.Inject;
@@ -26,6 +27,7 @@ public class ChatFadeOverlay extends Overlay
 	private static final int PADDING_BOTTOM = 4;
 	private static final int PADDING_LEFT = 5;
 	private static final int SHADOW_OFFSET = 1;
+	private static final int ICON_SPACING = 2;
 
 	// Placeholder shown in the chatbox input when Key Remapping's "Press Enter to Chat" is active.
 	private static final String PRESS_ENTER_TO_CHAT = "Press Enter to Chat...";
@@ -164,6 +166,12 @@ public class ChatFadeOverlay extends Overlay
 		int maxWidth = config.maxMessageWidth();
 		List<ColorSpan> spans = msg.getColorSpans();
 
+		// Rank and account-type badges always precede the name, so they are drawn first and
+		// everything after them simply starts further along.
+		int iconWidth = drawSenderIcons(graphics, msg.getSenderIcons(), x, y, fm, maxWidth);
+		x += iconWidth;
+		maxWidth -= iconWidth;
+
 		boolean isNpcMessage = msg.getType() == net.runelite.api.ChatMessageType.DIALOG
 			|| msg.getType() == net.runelite.api.ChatMessageType.MESBOX;
 		Color nameColor = isNpcMessage && config.colorizeNpcNames() ? config.npcNameColor()
@@ -251,6 +259,19 @@ public class ChatFadeOverlay extends Overlay
 
 		for (ColorSpan span : spans)
 		{
+			if (span.isIcon())
+			{
+				int iconWidth = drawIcon(graphics, span.getImage(), currentX, y, fm,
+					maxWidth - usedWidth);
+				if (iconWidth < 0)
+				{
+					break;
+				}
+				currentX += iconWidth;
+				usedWidth += iconWidth;
+				continue;
+			}
+
 			String text = span.getText();
 			int spanWidth = fm.stringWidth(text);
 
@@ -278,6 +299,60 @@ public class ChatFadeOverlay extends Overlay
 				break;
 			}
 		}
+	}
+
+	/**
+	 * Draws the badges that precede a sender's name.
+	 *
+	 * @return the total width consumed
+	 */
+	private int drawSenderIcons(Graphics2D graphics, List<BufferedImage> icons,
+		int x, int y, FontMetrics fm, int maxWidth)
+	{
+		if (icons == null || icons.isEmpty())
+		{
+			return 0;
+		}
+
+		int used = 0;
+		for (BufferedImage icon : icons)
+		{
+			int width = drawIcon(graphics, icon, x + used, y, fm, maxWidth - used);
+			if (width < 0)
+			{
+				break;
+			}
+			used += width;
+		}
+		return used;
+	}
+
+	/**
+	 * Draws an inline chat icon on the text baseline.
+	 *
+	 * <p>Icons are drawn at their natural size and sit slightly above the baseline so they
+	 * line up with the text rather than hanging below it.
+	 *
+	 * @return the width consumed including trailing spacing, or -1 when it will not fit
+	 */
+	private int drawIcon(Graphics2D graphics, BufferedImage icon, int x, int y,
+		FontMetrics fm, int remainingWidth)
+	{
+		if (icon == null)
+		{
+			return 0;
+		}
+
+		int width = icon.getWidth() + ICON_SPACING;
+		if (width > remainingWidth)
+		{
+			return -1;
+		}
+
+		// Centre the icon on the text's x-height so it reads as part of the line.
+		int top = y - fm.getAscent() + Math.max(0, (fm.getAscent() - icon.getHeight()) / 2);
+		graphics.drawImage(icon, x, top, null);
+		return width;
 	}
 
 	private String truncate(String text, FontMetrics fm, int maxWidth)

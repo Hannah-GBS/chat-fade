@@ -1,6 +1,7 @@
 package com.chatfade;
 
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
@@ -35,4 +36,10 @@ public class FadingMessage
 	 * chat commands replacing "!kc" with the real kill count.
 	 */
 	private final String rawText;
+
+	/**
+	 * Rank, title and account-type badges that precede the sender's name. These always
+	 * appear as a prefix in chat, so they need no positioning beyond drawing in order.
+	 */
+	private final List<BufferedImage> senderIcons;
 }

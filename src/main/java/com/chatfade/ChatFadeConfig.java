@@ -175,6 +175,19 @@ public interface ChatFadeConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showChatIcons",
+		name = "Show Chat Icons",
+		description = "Draw inline chat icons instead of dropping them: emoji, clan and friends "
+			+ "chat rank badges, ironman icons and mod crowns",
+		position = 175,
+		section = displaySection
+	)
+	default boolean showChatIcons()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "preserveInlineColors",
 		name = "Preserve In-Game Colors",
 		description = "Show messages with their original in-game colors (e.g. prayer warnings, PVM notifications). When off, all messages use per-type colors.",
