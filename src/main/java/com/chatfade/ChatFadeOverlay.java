@@ -16,6 +16,8 @@ import net.runelite.api.Client;
 import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.client.config.ChatColorConfig;
+import net.runelite.client.ui.JagexColors;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -29,23 +31,29 @@ public class ChatFadeOverlay extends Overlay
 	private static final int SHADOW_OFFSET = 1;
 	private static final int ICON_SPACING = 2;
 
+	/** The chatbox draws channel brackets in its plain text colour. */
+	private static final Color CHANNEL_BRACKET_COLOR = Color.WHITE;
+
 	// Placeholder shown in the chatbox input when Key Remapping's "Press Enter to Chat" is active.
 	private static final String PRESS_ENTER_TO_CHAT = "Press Enter to Chat...";
 
 	private final Client client;
 	private final ChatFadePlugin plugin;
 	private final ChatFadeConfig config;
+	private final ChatColorConfig chatColorConfig;
 
 	// Sticky: once we observe the "Press Enter to Chat" prompt we remember the user has it enabled,
 	// because the prompt text disappears the moment they press Enter and can't be re-detected.
 	private boolean keyRemapping = false;
 
 	@Inject
-	public ChatFadeOverlay(Client client, ChatFadePlugin plugin, ChatFadeConfig config)
+	public ChatFadeOverlay(Client client, ChatFadePlugin plugin, ChatFadeConfig config,
+		ChatColorConfig chatColorConfig)
 	{
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
+		this.chatColorConfig = chatColorConfig;
 
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
@@ -166,17 +174,25 @@ public class ChatFadeOverlay extends Overlay
 		int maxWidth = config.maxMessageWidth();
 		List<ColorSpan> spans = msg.getColorSpans();
 
-		// The channel comes first, in the message type's own colour rather than the username
-		// colour — it describes where the message came from, not who sent it.
+		// The channel comes first. With in-game colours preserved it matches the chatbox:
+		// plain brackets around a name in the channel-name colour. Otherwise the whole thing
+		// takes the message type's Chat Fade colour.
 		String channel = msg.getChannelName();
 		if (channel != null)
 		{
-			String channelPart = "[" + channel + "] ";
-			int channelWidth = fm.stringWidth(channelPart);
-			graphics.setColor(shadowColor);
-			graphics.drawString(channelPart, x + SHADOW_OFFSET, y + SHADOW_OFFSET);
-			graphics.setColor(withAlpha(msg.getColor(), alpha));
-			graphics.drawString(channelPart, x, y);
+			int channelWidth;
+			if (config.preserveInlineColors())
+			{
+				channelWidth = drawPart(graphics, fm, "[", x, y, CHANNEL_BRACKET_COLOR, alpha);
+				channelWidth += drawPart(graphics, fm, channel, x + channelWidth, y,
+					channelNameColor(msg.getType()), alpha);
+				channelWidth += drawPart(graphics, fm, "] ", x + channelWidth, y,
+					CHANNEL_BRACKET_COLOR, alpha);
+			}
+			else
+			{
+				channelWidth = drawPart(graphics, fm, "[" + channel + "] ", x, y, msg.getColor(), alpha);
+			}
 			x += channelWidth;
 			maxWidth -= channelWidth;
 		}
@@ -314,6 +330,43 @@ public class ChatFadeOverlay extends Overlay
 				break;
 			}
 		}
+	}
+
+	/** Draws a run of text with the overlay's shadow. @return the width drawn */
+	private int drawPart(Graphics2D graphics, FontMetrics fm, String text, int x, int y,
+		Color color, float alpha)
+	{
+		graphics.setColor(new Color(0, 0, 0, Math.round(alpha * 255)));
+		graphics.drawString(text, x + SHADOW_OFFSET, y + SHADOW_OFFSET);
+		graphics.setColor(withAlpha(color, alpha));
+		graphics.drawString(text, x, y);
+		return fm.stringWidth(text);
+	}
+
+	/**
+	 * The colour the game gives a channel name, honouring RuneLite's Chat Color settings when
+	 * they have been customised.
+	 *
+	 * <p>Uses the transparent-chatbox palette regardless of the player's chatbox mode: the
+	 * overlay is drawn over the game world, where the opaque palette's dark blue on black
+	 * brackets would be unreadable.
+	 */
+	private Color channelNameColor(net.runelite.api.ChatMessageType type)
+	{
+		Color custom;
+		switch (type)
+		{
+			case FRIENDSCHAT:
+				custom = chatColorConfig.transparentFriendsChatChannelName();
+				break;
+			case CLAN_GUEST_CHAT:
+				custom = chatColorConfig.transparentClanChannelGuestName();
+				break;
+			default:
+				custom = chatColorConfig.transparentClanChannelName();
+				break;
+		}
+		return custom != null ? custom : JagexColors.CHAT_FC_NAME_TRANSPARENT_BACKGROUND;
 	}
 
 	/**
