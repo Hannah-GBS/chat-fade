@@ -17,6 +17,14 @@ A RuneLite plugin that displays chat messages as floating, fading text above the
 - **Above-chatbox positioning** — when chatbox is open, messages appear above it instead of overlapping
 - **Avoids split private chat** — overlay repositions above any split PM messages currently on screen
 - **Dialog awareness** — when a game dialog requires a response (e.g. High Alchemy warning), messages pin at full opacity and a prompt appears to open the chatbox
+- **Inline chat icons** — emoji, clan and friends chat rank badges, ironman icons and mod crowns render in the overlay instead of being dropped
+- **Channel names** — optionally prefix clan and friends chat with the channel, e.g. `[Valence] Bob: hi`
+- **Loot value tiers** — clan drop broadcasts and your own "Valuable drop" notifications colour the item and value by GE value, like the Ground Items plugin
+- **Collection log highlighting** — clan collection log broadcasts colour the item name
+- **PM direction** — private messages are prefixed `From`/`To` so incoming and outgoing are distinguishable
+- **In-game colour preservation** — messages keep the colours the game gave them, including the older `@name@` palette syntax
+- **Chat Filter integration** — messages the Chat Filter plugin blocks or censors are blocked or censored here too
+- **Per-message ignore lists** — hide messages by text fragment or regular expression, independently of any other plugin
 - Configurable display duration, fade speed, and max width
 - Filter which message types are shown
 
@@ -33,13 +41,24 @@ A RuneLite plugin that displays chat messages as floating, fading text above the
 | Username Color | Color used for player names | White |
 | Colorize NPC Names | Show NPC names in a separate color | On |
 | NPC Name Color | Color used for NPC names | Golden yellow |
+| Show Chat Icons | Draw emoji, rank badges, crowns and ironman icons | On |
+| Show Channel Name | Prefix clan/friends chat with the channel in brackets | Off |
+| Preserve In-Game Colors | Keep the colours the game gave a message | On |
 | Use Default Colors | Distinct color per message type | On |
 | Only When Chatbox Collapsed | Only show overlay when chatbox is hidden | On |
 | Show Typing Input | Show typed text overlay when chatbox is collapsed | On |
+| Show PM Direction | Prefix private messages with From/To | On |
+| Respect Chat Filter Plugin | Hide messages the Chat Filter plugin removed | On |
+| Ignored Messages | Comma-separated text fragments to hide | — |
+| Ignored Regex | One regular expression per line to hide | — |
+| Colour Loot Drops By Value | Tier drop broadcasts by GE value | On |
+| Highlight Collection Log Items | Colour the item name in collection log broadcasts | On |
 
 **Custom Colors** — When "Use Default Colors" is off, per-type color pickers are available for: Game Messages, Notifications, Public Chat, Private Messages, Clan Chat, Friends Chat, Trade, Broadcast, Examine, and NPC Dialogue.
 
-**Message type filters** (Game, Public, Private, Clan, Friends, Trade, Examine, Broadcast, NPC Dialogue) can be individually toggled in the config panel.
+**Item Highlighting** — Loot drops are coloured by value using four configurable tiers, defaulting to 20k / 500k / 5m / 50m. Collection log items use their own colour.
+
+**Message type filters** (Game, Public, Private, Clan, Guest Clan, Group Ironman, Friends, Trade, Examine, Broadcast, NPC Dialogue) can be individually toggled in the config panel.
 
 ## Installation
 
