@@ -305,6 +305,10 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 		{
 			sender = toDisplayText(sender);
 			sender = applyPrivateMessagePrefix(sender, type, config.showPmDirection());
+			if (config.showChannelName())
+			{
+				sender = applyChannelPrefix(sender, chatMessage.getSender());
+			}
 		}
 
 		// NPC dialogue arrives as "NPC Name|dialogue text" — split it so the name
@@ -532,6 +536,24 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			return config.lowValueColor();
 		}
 		return null;
+	}
+
+	/**
+	 * Prefixes the sender with the channel the message came through, e.g. "[Valence] Bob".
+	 *
+	 * <p>{@link net.runelite.api.events.ChatMessage#getSender()} carries the clan or friends
+	 * chat name and is empty for every other message type, so no type check is needed — only
+	 * channel messages have one. The bracket format matches how the game and RuneLite's own
+	 * chat notifications present it.
+	 */
+	static String applyChannelPrefix(String sender, String channel)
+	{
+		if (channel == null || channel.isEmpty())
+		{
+			return sender;
+		}
+
+		return "[" + Text.unescapeJagex(channel) + "] " + sender;
 	}
 
 	/**

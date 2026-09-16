@@ -424,6 +424,18 @@ public interface ChatFadeConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showChannelName",
+		name = "Show Channel Name",
+		description = "Prefix clan and friends chat with the channel name in brackets, e.g. \"[Valence] Bob: hi\"",
+		position = 37,
+		section = behaviorSection
+	)
+	default boolean showChannelName()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "showPmDirection",
 		name = "Show PM Direction",
 		description = "Prefix private messages with From/To, matching the in-game chatbox, "
