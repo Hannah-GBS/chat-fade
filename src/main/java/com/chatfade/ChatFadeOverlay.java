@@ -166,7 +166,22 @@ public class ChatFadeOverlay extends Overlay
 		int maxWidth = config.maxMessageWidth();
 		List<ColorSpan> spans = msg.getColorSpans();
 
-		// Rank and account-type badges always precede the name, so they are drawn first and
+		// The channel comes first, in the message type's own colour rather than the username
+		// colour — it describes where the message came from, not who sent it.
+		String channel = msg.getChannelName();
+		if (channel != null)
+		{
+			String channelPart = "[" + channel + "] ";
+			int channelWidth = fm.stringWidth(channelPart);
+			graphics.setColor(shadowColor);
+			graphics.drawString(channelPart, x + SHADOW_OFFSET, y + SHADOW_OFFSET);
+			graphics.setColor(withAlpha(msg.getColor(), alpha));
+			graphics.drawString(channelPart, x, y);
+			x += channelWidth;
+			maxWidth -= channelWidth;
+		}
+
+		// Rank and account-type badges always precede the name, so they are drawn next and
 		// everything after them simply starts further along.
 		int iconWidth = drawSenderIcons(graphics, msg.getSenderIcons(), x, y, fm, maxWidth);
 		x += iconWidth;

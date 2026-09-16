@@ -42,4 +42,12 @@ public class FadingMessage
 	 * appear as a prefix in chat, so they need no positioning beyond drawing in order.
 	 */
 	private final List<BufferedImage> senderIcons;
+
+	/**
+	 * Clan or friends chat channel this came through, without brackets, or null.
+	 *
+	 * <p>Kept apart from the sender name so it can be drawn in the message type's own colour
+	 * rather than the username colour.
+	 */
+	private final String channelName;
 }

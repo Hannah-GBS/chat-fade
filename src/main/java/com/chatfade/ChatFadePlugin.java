@@ -103,6 +103,9 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	@Inject
 	private ClientThread clientThread;
 
+	@Inject
+	private net.runelite.client.game.ChatIconManager chatIconManager;
+
 	// ── State ───────────────────────────────────────────────
 
 	@Getter
@@ -243,7 +246,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			{
 				msg.setText(cleaned);
 				msg.setColorSpans(config.preserveInlineColors()
-					? parseColorSpans(raw, msg.getColor())
+					? parseColorSpans(raw, msg.getColor(), iconResolver())
 					: null);
 				msg.setMessageNode(null);
 			}
@@ -303,15 +306,11 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 		String cleanedText = toDisplayText(rawMessage);
 
 		String sender = chatMessage.getName();
-		List<java.awt.image.BufferedImage> senderIcons = extractSenderIcons(sender);
+		List<java.awt.image.BufferedImage> senderIcons = extractSenderIcons(type, sender);
 		if (sender != null && !sender.isEmpty())
 		{
 			sender = toDisplayText(sender);
 			sender = applyPrivateMessagePrefix(sender, type, config.showPmDirection());
-			if (config.showChannelName())
-			{
-				sender = applyChannelPrefix(sender, chatMessage.getSender());
-			}
 		}
 
 		// NPC dialogue arrives as "NPC Name|dialogue text" — split it so the name
@@ -361,6 +360,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 			.messageId(messageNode != null ? messageNode.getId() : -1)
 			.rawText(chatMessage.getMessage())
 			.senderIcons(senderIcons)
+			.channelName(config.showChannelName() ? channelName(chatMessage.getSender()) : null)
 			.build();
 
 		messages.add(fadingMessage);
@@ -610,14 +610,99 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	 * <p>Rank, title and account-type icons are always a prefix in chat, so they are kept as
 	 * an ordered list rather than positioned spans.
 	 */
-	private List<java.awt.image.BufferedImage> extractSenderIcons(String rawName)
+	/**
+	 * Resolves the rank badge shown beside a sender's name in clan and friends chat.
+	 *
+	 * <p>These are not in the chat message at all — the chatbox looks the sender's rank up
+	 * from the channel as it draws each line, so the same lookup has to happen here.
+	 */
+	private java.awt.image.BufferedImage resolveRankIcon(ChatMessageType type, String rawName)
 	{
-		if (!config.showChatIcons() || rawName == null || rawName.indexOf('<') < 0)
+		if (!config.showChatIcons() || rawName == null || rawName.isEmpty())
+		{
+			return null;
+		}
+
+		String name = Text.toJagexName(Text.removeTags(rawName));
+
+		switch (type)
+		{
+			case FRIENDSCHAT:
+			{
+				net.runelite.api.FriendsChatManager manager = client.getFriendsChatManager();
+				if (manager == null)
+				{
+					return null;
+				}
+				net.runelite.api.FriendsChatMember member = manager.findByName(name);
+				if (member == null)
+				{
+					return null;
+				}
+				net.runelite.api.FriendsChatRank rank = member.getRank();
+				return rank == null || rank == net.runelite.api.FriendsChatRank.UNRANKED
+					? null
+					: chatIconManager.getRankImage(rank);
+			}
+
+			case CLAN_CHAT:
+				return clanRankImage(client.getClanChannel(), client.getClanSettings(), name);
+
+			case CLAN_GUEST_CHAT:
+				return clanRankImage(client.getGuestClanChannel(), client.getGuestClanSettings(), name);
+
+			case CLAN_GIM_CHAT:
+				return clanRankImage(
+					client.getClanChannel(net.runelite.api.clan.ClanID.GROUP_IRONMAN),
+					client.getClanSettings(net.runelite.api.clan.ClanID.GROUP_IRONMAN),
+					name);
+
+			default:
+				return null;
+		}
+	}
+
+	private java.awt.image.BufferedImage clanRankImage(net.runelite.api.clan.ClanChannel channel,
+		net.runelite.api.clan.ClanSettings settings, String name)
+	{
+		if (channel == null || settings == null)
+		{
+			return null;
+		}
+
+		net.runelite.api.clan.ClanChannelMember member = channel.findMember(name);
+		if (member == null || member.getRank() == null)
+		{
+			return null;
+		}
+
+		net.runelite.api.clan.ClanTitle title = settings.titleForRank(member.getRank());
+		return title == null ? null : chatIconManager.getRankImage(title);
+	}
+
+	private List<java.awt.image.BufferedImage> extractSenderIcons(ChatMessageType type, String rawName)
+	{
+		if (!config.showChatIcons())
 		{
 			return null;
 		}
 
 		List<java.awt.image.BufferedImage> icons = null;
+
+		// The channel rank badge comes first, matching the chatbox.
+		java.awt.image.BufferedImage rank = resolveRankIcon(type, rawName);
+		if (rank != null)
+		{
+			icons = new ArrayList<>(2);
+			icons.add(rank);
+		}
+
+		if (rawName == null || rawName.indexOf('<') < 0)
+		{
+			return icons;
+		}
+
+		// Some plugins append their own icons to the name (friend notes, for example).
 		Matcher matcher = ChatIcons.IMG_TAG.matcher(rawName);
 		while (matcher.find())
 		{
@@ -637,21 +722,21 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	}
 
 	/**
-	 * Prefixes the sender with the channel the message came through, e.g. "[Valence] Bob".
+	 * @return the channel a message came through, or null when it came through none.
 	 *
 	 * <p>{@link net.runelite.api.events.ChatMessage#getSender()} carries the clan or friends
 	 * chat name and is empty for every other message type, so no type check is needed — only
-	 * channel messages have one. The bracket format matches how the game and RuneLite's own
-	 * chat notifications present it.
+	 * channel messages have one.
 	 */
-	static String applyChannelPrefix(String sender, String channel)
+	static String channelName(String channel)
 	{
 		if (channel == null || channel.isEmpty())
 		{
-			return sender;
+			return null;
 		}
 
-		return "[" + Text.unescapeJagex(channel) + "] " + sender;
+		String cleaned = Text.unescapeJagex(channel).trim();
+		return cleaned.isEmpty() ? null : cleaned;
 	}
 
 	/**
@@ -721,7 +806,14 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 				if (!cleanedUpdate.equals(msg.getText()))
 				{
 					msg.setText(cleanedUpdate);
-					msg.setColorSpans(parseColorSpans(expanded, msg.getColor()));
+					// Emoji reach us here, not at ingest: the Emoji plugin rewrites the node
+				// after ChatMessage has already fired, so this path must resolve icons too.
+				List<ColorSpan> updatedSpans = parseColorSpans(expanded, msg.getColor(), iconResolver());
+				if (!config.preserveInlineColors())
+				{
+					updatedSpans = dropSpanColours(updatedSpans, msg.getColor());
+				}
+				msg.setColorSpans(updatedSpans);
 					msg.setMessageNode(null);
 				}
 			}

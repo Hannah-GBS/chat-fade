@@ -81,38 +81,27 @@ public class PrivateMessagePrefixTest
 			ChatFadePlugin.applyPrivateMessagePrefix("Zezima", ChatMessageType.PRIVATECHATOUT, false));
 	}
 
-	// ── Channel name prefix ─────────────────────────────────
+	// ── Channel name ────────────────────────────────────────
 
 	@Test
-	public void prefixesTheChannelNameInBrackets()
+	public void extractsTheChannelName()
 	{
-		assertEquals("[Valence] Bob", ChatFadePlugin.applyChannelPrefix("Bob", "Valence"));
+		assertEquals("Valence", ChatFadePlugin.channelName("Valence"));
 	}
 
 	@Test
-	public void leavesSenderAloneWhenThereIsNoChannel()
+	public void hasNoChannelForTypesThatCarryNone()
 	{
-		// Only clan and friends chat carry a channel; every other type has none.
-		assertEquals("Bob", ChatFadePlugin.applyChannelPrefix("Bob", null));
-		assertEquals("Bob", ChatFadePlugin.applyChannelPrefix("Bob", ""));
+		// Only clan and friends chat populate the sender field.
+		org.junit.Assert.assertNull(ChatFadePlugin.channelName(null));
+		org.junit.Assert.assertNull(ChatFadePlugin.channelName(""));
+		org.junit.Assert.assertNull(ChatFadePlugin.channelName("   "));
 	}
 
 	@Test
 	public void unescapesChannelNames()
 	{
 		// Channel names go through the same escaping as any other game text.
-		assertEquals("[Bob@s clan] Bob",
-			ChatFadePlugin.applyChannelPrefix("Bob", "Bob<at>s clan"));
-	}
-
-	@Test
-	public void composesWithThePmDirectionPrefix()
-	{
-		// The two prefixes are independent; a PM has no channel, but the ordering must be
-		// stable if both ever applied.
-		String withDirection = ChatFadePlugin.applyPrivateMessagePrefix(
-			"Bob", ChatMessageType.PRIVATECHAT, true);
-
-		assertEquals("From Bob", ChatFadePlugin.applyChannelPrefix(withDirection, null));
+		assertEquals("Bob@s clan", ChatFadePlugin.channelName("Bob<at>s clan"));
 	}
 }
