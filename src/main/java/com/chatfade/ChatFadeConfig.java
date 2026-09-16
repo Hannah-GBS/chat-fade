@@ -102,7 +102,7 @@ public interface ChatFadeConfig extends Config
 		keyName = "xOffset",
 		name = "Horizontal Offset",
 		description = "Shift the overlay right (positive) or left (negative) from its default position",
-		position = 131,
+		position = 22,
 		section = displaySection
 	)
 	@Units(Units.PIXELS)
@@ -116,7 +116,7 @@ public interface ChatFadeConfig extends Config
 		keyName = "yOffset",
 		name = "Vertical Offset",
 		description = "Shift the overlay down (positive) or up (negative) from its default position",
-		position = 132,
+		position = 23,
 		section = displaySection
 	)
 	@Units(Units.PIXELS)
@@ -179,7 +179,7 @@ public interface ChatFadeConfig extends Config
 		name = "Show Chat Icons",
 		description = "Draw inline chat icons instead of dropping them: emoji, clan and friends "
 			+ "chat rank badges, ironman icons and mod crowns",
-		position = 175,
+		position = 18,
 		section = displaySection
 	)
 	default boolean showChatIcons()
@@ -188,10 +188,22 @@ public interface ChatFadeConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showChannelName",
+		name = "Show Channel Name",
+		description = "Prefix clan and friends chat with the channel name in brackets, e.g. \"[Valence] Bob: hi\"",
+		position = 19,
+		section = displaySection
+	)
+	default boolean showChannelName()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "preserveInlineColors",
 		name = "Preserve In-Game Colors",
 		description = "Show messages with their original in-game colors (e.g. prayer warnings, PVM notifications). When off, all messages use per-type colors.",
-		position = 18,
+		position = 20,
 		section = displaySection
 	)
 	default boolean preserveInlineColors()
@@ -203,7 +215,7 @@ public interface ChatFadeConfig extends Config
 		keyName = "useOriginalColors",
 		name = "Use Default Colors",
 		description = "Use built-in colors per message type. Turn off to customize colors below.",
-		position = 19,
+		position = 21,
 		section = displaySection
 	)
 	default boolean useOriginalColors()
@@ -434,18 +446,6 @@ public interface ChatFadeConfig extends Config
 	default String ignoredRegex()
 	{
 		return "";
-	}
-
-	@ConfigItem(
-		keyName = "showChannelName",
-		name = "Show Channel Name",
-		description = "Prefix clan and friends chat with the channel name in brackets, e.g. \"[Valence] Bob: hi\"",
-		position = 37,
-		section = behaviorSection
-	)
-	default boolean showChannelName()
-	{
-		return false;
 	}
 
 	@ConfigItem(
