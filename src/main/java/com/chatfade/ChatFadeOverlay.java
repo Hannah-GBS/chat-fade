@@ -60,6 +60,20 @@ public class ChatFadeOverlay extends Overlay
 		setPriority(OverlayPriority.HIGH);
 	}
 
+	/**
+	 * Chooses whether interfaces cover the overlay.
+	 *
+	 * <p>UNDER_WIDGETS draws under every interface but still above the game scene, so chat
+	 * stays visible while playing and the bank, Grand Exchange and similar simply cover it.
+	 *
+	 * <p>The overlay manager reads the layer only when an overlay is registered, so the
+	 * plugin re-adds this overlay after calling it.
+	 */
+	void setDrawUnderInterfaces(boolean underInterfaces)
+	{
+		setLayer(underInterfaces ? OverlayLayer.UNDER_WIDGETS : OverlayLayer.ABOVE_WIDGETS);
+	}
+
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{

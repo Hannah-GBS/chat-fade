@@ -127,6 +127,19 @@ public interface ChatFadeConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "drawUnderInterfaces",
+		name = "Draw Behind Interfaces",
+		description = "Let interfaces such as the bank cover the overlay instead of the text "
+			+ "being drawn on top of them",
+		position = 24,
+		section = displaySection
+	)
+	default boolean drawUnderInterfaces()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "colorizeUsernames",
 		name = "Colorize Usernames",
 		description = "Show player names in a separate color from the message text",

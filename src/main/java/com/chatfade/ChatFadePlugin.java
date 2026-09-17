@@ -124,7 +124,7 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 	protected void startUp()
 	{
 		rebuildIgnoreLists();
-		overlayManager.add(overlay);
+		applyOverlayLayer();
 		spriteManager.addSpriteOverrides(FixedHideChatSprites.values());
 		keyManager.registerKeyListener(this);
 	}
@@ -778,6 +778,21 @@ public class ChatFadePlugin extends Plugin implements KeyListener
 		{
 			rebuildIgnoreLists();
 		}
+		else if ("drawUnderInterfaces".equals(event.getKey()))
+		{
+			applyOverlayLayer();
+		}
+	}
+
+	/**
+	 * Registers the overlay on the layer the config asks for. The overlay manager reads an
+	 * overlay's layer only when it is added, so changing it means re-adding.
+	 */
+	private void applyOverlayLayer()
+	{
+		overlayManager.remove(overlay);
+		overlay.setDrawUnderInterfaces(config.drawUnderInterfaces());
+		overlayManager.add(overlay);
 	}
 
 	private void rebuildIgnoreLists()
